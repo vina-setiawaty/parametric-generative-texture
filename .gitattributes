@@ -1,0 +1,5 @@
+# G-code golden fixtures are compared byte-for-content by
+# tests/golden-brushes.mjs; keep them as LF so a Windows checkout
+# (core.autocrlf=true) doesn't rewrite them to CRLF and make an unrelated
+# line-ending diff look like a library regression.
+tests/golden/*.gcode text eol=lf

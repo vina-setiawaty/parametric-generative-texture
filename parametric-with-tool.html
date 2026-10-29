@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>3dp sewing machine - parametric tactile graphics (staged pipeline, experimental)</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.3.1/p5.js"></script>
+  <script src="lib/p5.fab.sewing.js" type="text/javascript"></script>
+  <script src="https://unpkg.com/p5-webserial@0.1.1/build/p5.webserial.js"></script>
+</head>
+
+<style>
+  *,
+  html {
+    box-sizing: border-box;
+    font-family: sans-serif;
+    font-size: 12px;
+    font-weight: 400;
+    margin: 0;
+    padding: 0;
+  }
+
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: -1;
+  }
+
+  h1 {
+    font-size: 0.8rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    position: relative;
+    display: block;
+    clear: both;
+    margin-bottom: 1em;
+  }
+
+  #container {
+    position: relative;
+    width: 100vw;
+    min-height: 100vh;
+    padding: 1em;
+  }
+
+  .btn {
+    padding: 0.5em 0.7em;
+    cursor: pointer;
+    background: #666;
+    color: white;
+    border-radius: 0.7em;
+    transition: all 100ms ease-in;
+    user-select: none;
+    display: inline-block;
+  }
+
+  .btn:hover { background: #777; }
+  .btn:active { background: #888; }
+  .btn.active { background: #33AA00; }
+  .btn.disabled { opacity: 0.4; pointer-events: none; }
+
+  div.ui-frame {
+    margin: 1em;
+    padding: 0.5em 0.75em;
+    border: 1px solid #999;
+    border-radius: 0.5em;
+    position: relative;
+    float: left;
+    display: block;
+  }
+
+  div.ui-group {
+    position: relative;
+    display: block;
+    clear: both;
+    margin-top: 0.5em;
+  }
+
+  div.ui-group::after { content: ""; display: table; clear: both; }
+
+  div.ui-item {
+    position: relative;
+    float: left;
+    margin: 0 1em 0.3em 0;
+    border-radius: 0.2em;
+  }
+
+  span.label {
+    font-family: monospace;
+    font-size: 0.8em;
+    display: inline-block;
+    padding-right: 0.4em;
+  }
+
+  div.ui-item input[type=number] { width: 5em; }
+  div.ui-item input[type=checkbox] { padding: 0; margin: 0; }
+
+  #messages {
+    width: 220px;
+    height: 18em;
+    overflow: scroll;
+  }
+
+  #messages h1 span u {
+    position: absolute;
+    right: 0;
+    top: 0.5em;
+    font-size: 0.7em;
+    color: #CCC;
+    cursor: pointer;
+  }
+
+  #messages li {
+    position: relative;
+    clear: both;
+    font-family: monospace;
+    font-size: 0.8em;
+    list-style: none;
+  }
+
+  .motion.btn {
+    background: white;
+    border: 1px solid #999;
+    color: black;
+    width: 3em;
+    height: 3em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .motion.btn:hover { background: #EEE; }
+  .motion.btn:active { background: #DDD; }
+
+  /* ---- 3-column parametric workspace ---- */
+
+  #pg-workspace {
+    display: grid;
+    grid-template-columns: 1.1fr 340px 1fr;
+    gap: 1em;
+    height: 72vh;
+    min-height: 480px;
+    padding: 1em;
+  }
+
+  .pg-col {
+    border: 1px solid #999;
+    border-radius: 0.5em;
+    padding: 0.6em 0.75em;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .pg-col h1 { flex: 0 0 auto; }
+
+  #pg-transcript {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 0.3em;
+    margin-bottom: 0.5em;
+  }
+
+  .pg-msg { margin-bottom: 0.8em; }
+  .pg-role {
+    font-family: monospace;
+    font-size: 0.7em;
+    text-transform: uppercase;
+    color: #999;
+    display: block;
+  }
+  .pg-msg-body { white-space: pre-wrap; font-size: 0.95em; }
+  .pg-user .pg-msg-body { background: #EEF3F8; border-radius: 0.4em; padding: 0.4em 0.55em; }
+  .pg-assistant .pg-msg-body { background: #F5F5F0; border-radius: 0.4em; padding: 0.4em 0.55em; }
+
+  #pg-config { flex: 0 0 auto; margin-bottom: 0.5em; }
+  #pg-config summary { cursor: pointer; font-family: monospace; font-size: 0.8em; color: #666; }
+  #pg-config .ui-group { margin-top: 0.35em; }
+  #pg-config select, #pg-config input { font-size: 0.9em; }
+
+  #pg-input {
+    width: 100%;
+    height: 4.5em;
+    resize: vertical;
+  }
+
+  .pg-send-row {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 0.5em;
+    align-items: center;
+    margin-top: 0.4em;
+  }
+
+  .llm-status { font-size: 0.8em; font-family: monospace; color: #666; }
+  .llm-cost-tracker { font-size: 0.75em; font-family: monospace; color: #888; margin-top: 0.4em; }
+  .llm-messages { font-size: 0.95em; font-family: monospace; color: #c00; list-style: none; margin-top: 0.4em; }
+
+  #pg-params { flex: 1; overflow-y: auto; }
+
+  .pg-call {
+    border: 1px solid #DDD;
+    border-radius: 0.4em;
+    padding: 0.5em;
+    margin-bottom: 0.6em;
+  }
+  .pg-call-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5em;
+    margin-bottom: 0.4em;
+  }
+  .pg-call-label { font-weight: 600; font-size: 0.9em; }
+  .pg-call-fn { font-family: monospace; font-size: 0.75em; color: #888; }
+  .pg-call-del {
+    margin-left: auto;
+    font-size: 0.75em;
+    font-family: monospace;
+    color: #c00;
+    cursor: pointer;
+  }
+  .pg-fields-title {
+    font-family: monospace;
+    font-size: 0.7em;
+    text-transform: uppercase;
+    color: #999;
+    margin: 0.3em 0 0.2em;
+  }
+  .pg-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.25em 0.5em;
+  }
+  .pg-field {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85em;
+  }
+  .pg-field.pg-field-wide { grid-column: 1 / -1; }
+  .pg-field span { font-family: monospace; font-size: 0.75em; color: #666; }
+  .pg-field input, .pg-field select { width: 100%; }
+
+  #pg-digest {
+    flex: 0 0 auto;
+    font-size: 0.85em;
+    margin-bottom: 0.5em;
+    max-height: 40%;
+    overflow-y: auto;
+  }
+  .pg-digest-table { border-collapse: collapse; margin: 0.3em 0; }
+  .pg-digest-table td { border: 1px solid #EEE; padding: 0.15em 0.5em; font-family: monospace; font-size: 0.9em; }
+  .pg-ok { color: #2a7; font-weight: 600; }
+  .pg-notok { color: #c00; font-weight: 600; }
+  .pg-errs { color: #c00; }
+  .pg-warns { color: #a70; }
+  /* What the manager decided "done" meant for this turn, and whether the
+     app's own measured numbers agreed. */
+  #pg-verdict { flex: 0 0 auto; }
+  .pg-crits { margin: 0.2em 0 0.4em 0; padding-left: 1.1em; font-size: 0.85em; }
+  .pg-crits li { margin: 0.1em 0; }
+  .pg-crit-ok { color: #2a7; }
+  .pg-crit-bad { color: #c00; }
+  .pg-errs ul, .pg-warns ul { margin: 0.2em 0 0.4em 1.2em; }
+
+  #raw-gcode-textarea {
+    flex: 1;
+    width: 100%;
+    resize: none;
+    font-family: monospace;
+    font-size: 0.8em;
+  }
+
+  #pg-gcode-menu { flex: 0 0 auto; margin-top: 0.4em; display: flex; align-items: center; flex-wrap: wrap; }
+  #pg-gcode-menu .ui-item { float: none; }
+
+  #pg-report-wrap { flex: 0 0 auto; margin-bottom: 0.4em; max-height: 30%; overflow-y: auto; }
+  #pg-report-wrap summary { cursor: pointer; font-family: monospace; font-size: 0.8em; color: #666; }
+  #pg-report { font-family: monospace; font-size: 0.75em; white-space: pre-wrap; margin: 0.3em 0; color: #444; }
+
+  .pg-section {
+    font-family: monospace;
+    font-size: 0.75em;
+    text-transform: uppercase;
+    color: #666;
+    border-bottom: 1px solid #DDD;
+    margin: 0.8em 0 0.4em;
+    padding-bottom: 0.15em;
+  }
+  .pg-btn-row { display: flex; gap: 0.4em; margin-top: 0.4em; }
+  .pg-small-btn { font-size: 0.75em; padding: 0.25em 0.55em; }
+  .pg-piece { border-left: 2px solid #EEE; padding-left: 0.4em; margin: 0.3em 0; }
+  .pg-desc { font-size: 0.85em; color: #666; margin-bottom: 0.3em; }
+  /* Everything no surfaced group claims: reachable, but folded away so the
+     panel leads with the controls that matter for what was asked. */
+  .pg-all-options { margin-top: 0.8em; }
+  .pg-all-options > summary {
+    font-family: monospace;
+    font-size: 0.75em;
+    text-transform: uppercase;
+    color: #666;
+    border-bottom: 1px solid #DDD;
+    margin: 0.8em 0 0.4em;
+    padding-bottom: 0.15em;
+    cursor: pointer;
+  }
+  .pg-json { width: 100%; font-family: monospace; font-size: 0.8em; height: 3.5em; resize: vertical; }
+  .pg-json.pg-bad { border-color: #c00; background: #FFF4F4; }
+  .pg-retry { color: #06c; cursor: pointer; text-decoration: underline; margin-left: 0.5em; }
+
+  #printer-controls { clear: both; padding-top: 0.5em; }
+  #printer-controls h2 {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #666;
+    margin: 0 0 0 1em;
+  }
+
+  .pg-experimental-badge {
+    display: inline-block;
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: white;
+    background: #a35b00;
+    border-radius: 0.3em;
+    padding: 0.15em 0.5em;
+    margin-left: 0.5em;
+    vertical-align: middle;
+  }
+</style>
+
+<body>
+
+  <div id="container">
+
+    <div id="pg-workspace">
+
+      <!-- Column 1: chat -->
+      <div class="pg-col" id="pg-col-chat">
+        <h1>Describe the graphic <span class="pg-experimental-badge">staged pipeline</span>
+          <span style="float:right;">
+            <span class="btn" id="pg-save-log-btn" title="Download every stage call's raw LLM response for this session (user input + each function call's output), for debugging" style="font-size:0.85em;padding:0.3em 0.6em;">save log</span>
+            <span class="btn" id="pg-clear-log-btn" title="Clear the saved debug log (keeps the conversation and scene)" style="font-size:0.85em;padding:0.3em 0.6em;">clear log</span>
+            <span class="btn" id="pg-new-btn" style="font-size:0.85em;padding:0.3em 0.6em;">new</span>
+          </span>
+        </h1>
+
+        <details id="pg-config">
+          <summary>model &amp; material settings</summary>
+          <div class="ui-group">
+            <span class="label">Material</span>
+            <select id="pg-material">
+              <option value="TPU" selected>TPU (default)</option>
+              <option value="PLA">PLA</option>
+            </select>
+          </div>
+          <div class="ui-group">
+            <span class="label">OpenAI API key</span><input type="password" id="pg-openai-key" placeholder="sk-...">
+          </div>
+          <div class="ui-group">
+            <span class="label">Anthropic API key</span><input type="password" id="pg-anthropic-key" placeholder="sk-ant-...">
+          </div>
+          <div class="ui-group">
+            <span class="label">Provider</span>
+            <select id="pg-provider">
+              <option value="openai" selected>OpenAI</option>
+              <option value="anthropic">Claude (Anthropic)</option>
+            </select>
+          </div>
+          <div class="ui-group">
+            <span class="label">Model</span>
+            <select id="pg-model"></select>
+          </div>
+          <div class="ui-group">
+            <span class="label">Effort</span>
+            <select id="pg-effort">
+              <option value="low">low (fastest, cheapest)</option>
+              <option value="medium" selected>medium</option>
+              <option value="high">high (slower)</option>
+            </select>
+          </div>
+          <div class="ui-group">
+            <span class="label">Thinking</span>
+            <select id="pg-thinking">
+              <option value="off" selected>off (faster)</option>
+              <option value="on">on (slower, Claude only)</option>
+            </select>
+          </div>
+          <div class="ui-group">
+            <span class="label">Self-check</span>
+            <select id="pg-self-check">
+              <option value="on" selected>on (a follow-up call reviews geometry/texture against the app's own numbers, slower)</option>
+              <option value="off">off (faster — skip the review pass)</option>
+            </select>
+          </div>
+        </details>
+
+        <div id="pg-transcript"></div>
+
+        <textarea id="pg-input" placeholder="e.g. a bar chart with 3 bars: heights 5mm, 12mm, 8mm — then: shade the area between the axis and the curve; make the shading denser"></textarea>
+        <div class="pg-send-row">
+          <div class="btn" id="pg-send-btn">send</div>
+          <span id="pg-status" class="llm-status"></span>
+        </div>
+        <div id="pg-cost-tracker" class="llm-cost-tracker"></div>
+        <ul id="pg-messages" class="llm-messages"></ul>
+      </div>
+
+      <!-- Column 2: parameters -->
+      <div class="pg-col" id="pg-col-params">
+        <h1>Parameters</h1>
+        <div id="pg-params"></div>
+      </div>
+
+      <!-- Column 3: generated g-code -->
+      <div class="pg-col" id="pg-col-gcode">
+        <h1>Generated G-code</h1>
+        <details id="pg-report-wrap">
+          <summary>geometry report (what the model verifies against)</summary>
+          <pre id="pg-report"></pre>
+        </details>
+        <div id="pg-digest"></div>
+        <div id="pg-verdict"></div>
+        <textarea id="raw-gcode-textarea" spellcheck="false"></textarea>
+        <div class="ui-group" id="pg-gcode-menu">
+          <div class="ui-item"><div class="btn" id="run-gcode-btn">run gcode</div></div>
+          <div class="ui-item"><div class="btn" id="save-gcode-btn">save gcode</div></div>
+          <div class="ui-item"><span class="label">filename</span> <input type="text" id="gcode-filename-input" placeholder="output.gcode"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Printer controls (shared with index.html / gcode-session.html) -->
+    <div id="printer-controls">
+      <h2>Printer controls</h2>
+
+      <div class="ui-frame" id="messages">
+        <h1>Messages <span onclick="clearMsg()"><u>clear</u></span></h1>
+        <div id="message-container"></div>
+      </div>
+
+      <div class="ui-frame" id="main-controller">
+        <h1>Main Controller</h1>
+
+        <div class="ui-group">
+          <div class="ui-item">
+            <div class="btn" id="connect-btn" onclick="_fab.serial.requestPort()">connect to printer</div>
+          </div>
+        </div>
+
+        <div class="ui-group">
+          <div class="ui-item"><span class="label">Origin</span></div>
+        </div>
+
+        <div class="ui-group">
+          <div class="ui-item"><span class="label">X</span> <input type="number" min="0" step="1" value="100" id="start-x"></div>
+          <div class="ui-item"><span class="label">Y</span> <input type="number" min="0" step="1" value="100" id="start-y"></div>
+          <div class="ui-item"><span class="label">Z</span> <input type="number" min="0" step="1" value="10" id="start-z"></div>
+        </div>
+
+        <div class="ui-group">
+          <div class="ui-item"><div class="btn" id="start-btn">initialize printer</div></div>
+          <div class="ui-item"><div class="btn" id="stop-btn">stop printing</div></div>
+        </div>
+
+        <div class="ui-group">
+          <div class="ui-item"><span class="label">Nozzle Temp</span> <input type="number" min="0" step="1" value="220" id="nozzle-temp"></div>
+          <div class="ui-item"><span class="label">Bed Temp</span> <input type="number" min="0" step="1" value="50" id="bed-temp"></div>
+        </div>
+
+        <div class="ui-group">
+          <div class="ui-item"><div class="btn" id="heat-btn">heat nozzle/bed</div></div>
+          <div class="ui-item"><div class="btn" id="cool-btn">cool nozzle/bed</div></div>
+        </div>
+
+        <div class="ui-group">
+          <div class="ui-item"><span class="label">Fan Speed (0&ndash;255)</span> <input type="number" min="0" step="1" value="255" id="fan-speed"></div>
+          <div class="ui-item"><span class="label">fan on</span> <input type="checkbox" id="fan-on"></div>
+        </div>
+      </div>
+
+      <div class="ui-frame" id="motion-controller">
+        <h1>Motion controller</h1>
+        <div class="ui-group">
+          <div class="ui-item"><span class="label">motion step</span> <input type="number" min="0" step="0.1" value="5.0" id="motion-step-size"></div>
+          <div class="ui-item"><span class="label">feedrate</span> <input type="number" min="0" step="1" value="300" id="motion-feedrate"></div>
+        </div>
+        <div class="ui-group">
+          <div class="ui-item"><div class="btn motion" id="motion-z-up-btn">Z+</div></div>
+          <div class="ui-item"><div class="btn motion" id="motion-y-up-btn">Y+</div></div>
+          <div class="ui-item"><div class="btn motion" id="motion-e-down-btn">E-</div></div>
+        </div>
+        <div class="ui-group">
+          <div class="ui-item"><div class="btn motion" id="motion-x-down-btn">X-</div></div>
+          <div class="ui-item"><div class="btn motion" id="motion-home-btn">O</div></div>
+          <div class="ui-item"><div class="btn motion" id="motion-x-up-btn">X+</div></div>
+        </div>
+        <div class="ui-group">
+          <div class="ui-item"><div class="btn motion" id="motion-z-down-btn">Z-</div></div>
+          <div class="ui-item"><div class="btn motion" id="motion-y-down-btn">Y-</div></div>
+          <div class="ui-item"><div class="btn motion" id="motion-e-up-btn">E+</div></div>
+        </div>
+
+        <div class="ui-group">
+          <div class="ui-item"><span class="label">enable cold extrusion</span> <input type="checkbox" id="cold-extrusion"></div>
+        </div>
+        <div class="ui-group">
+          <div class="ui-item"><span class="label">keyboard control</span> <input type="checkbox" id="motion-keyboard-control"></div>
+        </div>
+        <div class="ui-group" id="motion-keyboard-control-instructions" style="display: none;">
+          <div class="ui-item"><span class="label">A/D: X-/+; S/W: Y-/+; Z/Q: Z-/+; R/E: E-/+</span></div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script type="text/javascript" src="script.js?v=4"></script>
+  <script type="text/javascript" src="llm.js?v=1"></script>
+  <script type="module" src="parametric-with-tool.js?v=3"></script>
+  <script type="text/javascript" src="parametric-with-tool-compat.js?v=1"></script>
+</body>
+
+</html>

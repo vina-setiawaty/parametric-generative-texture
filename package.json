@@ -1,0 +1,9 @@
+{
+  "name": "parametric-with-tool",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node tests/golden-brushes.mjs && node tests/compile-fixtures.mjs && node tests/prompt-assembly.mjs && node tests/pipeline.mjs",
+    "constraints": "node tests/print-constraints.mjs"
+  }
+}
