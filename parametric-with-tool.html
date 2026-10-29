@@ -342,6 +342,9 @@
       <div class="pg-col" id="pg-col-chat">
         <h1>Describe the graphic <span class="pg-experimental-badge">staged pipeline</span>
           <span style="float:right;">
+            <span class="btn" id="pg-save-session-btn" title="Download the whole session (scene, conversation, debug log) as a .json file you can load back later" style="font-size:0.85em;padding:0.3em 0.6em;">save session</span>
+            <span class="btn" id="pg-load-session-btn" title="Load a .json file from &quot;save session&quot; — replaces the current scene, conversation and debug log" style="font-size:0.85em;padding:0.3em 0.6em;">load session</span>
+            <input type="file" id="pg-load-session-input" accept=".json,application/json" style="display:none;">
             <span class="btn" id="pg-save-log-btn" title="Download every stage call's raw LLM response for this session (user input + each function call's output), for debugging" style="font-size:0.85em;padding:0.3em 0.6em;">save log</span>
             <span class="btn" id="pg-clear-log-btn" title="Clear the saved debug log (keeps the conversation and scene)" style="font-size:0.85em;padding:0.3em 0.6em;">clear log</span>
             <span class="btn" id="pg-new-btn" style="font-size:0.85em;padding:0.3em 0.6em;">new</span>

@@ -29,6 +29,7 @@ import {
   composeJudgeMessage, composeRefineMessage,
 } from "./prompt-assembly.js";
 import { runTurn, CHAIN } from "./pipeline.js";
+import { serializeSession, parseSession } from "./session-file.js";
 
 const STORAGE_KEY = "parametricWithToolSessionState";
 const DEBUG_LOG_KEY = "parametricWithToolDebugLog";
@@ -118,8 +119,8 @@ function formatDebugLog(log) {
   return lines.join("\n");
 }
 
-function downloadText(filename, text) {
-  const blob = new Blob([text], { type: "text/plain" });
+function downloadText(filename, text, type = "text/plain") {
+  const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = filename;
@@ -1146,6 +1147,32 @@ function newConversation() {
   showMessages([]);
 }
 
+function saveSession() {
+  if (!ready) return;
+  downloadText(`parametric-session-${new Date().toISOString().replace(/[:.]/g, "-")}.json`,
+    serializeSession(scene, debugLog), "application/json");
+}
+
+async function loadSessionFrom(file) {
+  if (!ready || !file) return;
+  if (busy) { showMessages(["wait for the current turn to finish before loading a session"]); return; }
+  let loaded;
+  try { loaded = parseSession(await file.text(), C); }
+  catch (e) { showMessages([`could not load ${escapeHtml(file.name)}: ${escapeHtml(e.message)}`]); return; }
+  if ((scene.messages.length || scene.elements.length) &&
+      !confirm(`Replace the current conversation, scene and debug log with ${file.name}?`)) return;
+  scene = loaded.scene;
+  debugLog = loaded.debugLog;
+  currentDebugTurn = null;
+  lastTurn = null;
+  saveScene();
+  saveDebugLog();
+  $("#pg-material").value = scene.config.material;
+  renderTranscript();
+  rerenderAll();
+  showMessages([`loaded ${escapeHtml(file.name)}${loaded.savedAt ? ` (saved ${escapeHtml(loaded.savedAt)})` : ""}`]);
+}
+
 function initParametricEditor() {
   $("#pg-send-btn").addEventListener("click", onSend);
   $("#pg-input").addEventListener("keydown", (e) => {
@@ -1158,6 +1185,13 @@ function initParametricEditor() {
   $("#pg-anthropic-key").addEventListener("change", () => saveApiKeyFrom("anthropic", "pg-anthropic-key"));
   $("#pg-provider").addEventListener("change", () => updateModelOptions("pg-provider", "pg-model"));
   $("#pg-new-btn").addEventListener("click", newConversation);
+  $("#pg-save-session-btn").addEventListener("click", saveSession);
+  $("#pg-load-session-btn").addEventListener("click", () => $("#pg-load-session-input").click());
+  $("#pg-load-session-input").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    e.target.value = "";   // so picking the same file again still fires change
+    loadSessionFrom(file);
+  });
   $("#pg-save-log-btn").addEventListener("click", () => {
     if (!debugLog.length) { showMessages(["the debug log is empty — send a message first"]); return; }
     downloadText(`parametric-log-${new Date().toISOString().replace(/[:.]/g, "-")}.txt`, formatDebugLog(debugLog));

@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/golden-brushes.mjs && node tests/compile-fixtures.mjs && node tests/prompt-assembly.mjs && node tests/pipeline.mjs",
+    "test": "node tests/run-all.mjs",
     "constraints": "node tests/print-constraints.mjs"
   }
 }
