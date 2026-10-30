@@ -138,7 +138,8 @@
 
   #pg-workspace {
     display: grid;
-    grid-template-columns: 1.1fr 340px 1fr;
+    /* chat | parameters | G-code | toolpath viewer */
+    grid-template-columns: 1fr 0.65fr 0.65fr 1fr;
     gap: 1em;
     height: 72vh;
     min-height: 480px;
@@ -275,6 +276,40 @@
 
   #pg-gcode-menu { flex: 0 0 auto; margin-top: 0.4em; display: flex; align-items: center; flex-wrap: wrap; }
   #pg-gcode-menu .ui-item { float: none; }
+
+  /* ---- toolpath viewer (gcode-viewer.js) ---- */
+  #pg-toolpath-wrap {
+    flex: 1;
+    position: relative;
+    min-height: 0;
+    border: 1px solid #DDD;
+    border-radius: 0.3em;
+    overflow: hidden;
+  }
+  /* override the page-wide `canvas` rule meant for p5's background canvas */
+  #pg-toolpath-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+  }
+  #pg-toolpath-canvas:active { cursor: grabbing; }
+  .pg-toolpath-bar { flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 0.4em; align-items: center; margin: 0.4em 0 0; }
+  #pg-toolpath-slider { flex: 1; min-width: 0; }
+  #pg-toolpath-label {
+    flex: 0 0 auto;
+    font-family: monospace;
+    font-size: 0.75em;
+    color: #666;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 0.3em;
+  }
+  .pg-toolpath-hint { font-family: monospace; font-size: 0.7em; color: #999; margin-left: auto; }
 
   #pg-report-wrap { flex: 0 0 auto; margin-bottom: 0.4em; max-height: 30%; overflow-y: auto; }
   #pg-report-wrap summary { cursor: pointer; font-family: monospace; font-size: 0.8em; color: #666; }
@@ -435,6 +470,24 @@
         </div>
       </div>
 
+      <!-- Column 4: toolpath preview of the G-code in column 3 -->
+      <div class="pg-col" id="pg-col-toolpath">
+        <h1>Toolpath</h1>
+        <div class="pg-toolpath-bar">
+          <span class="btn pg-small-btn" id="pg-toolpath-top">top</span>
+          <span class="btn pg-small-btn" id="pg-toolpath-iso">3D</span>
+          <span class="btn pg-small-btn" id="pg-toolpath-fit">fit</span>
+          <span class="btn pg-small-btn" id="pg-toolpath-travel" title="show travel (non-extruding) moves">travel</span>
+          <span class="pg-toolpath-hint">drag: orbit · right/shift-drag: pan · wheel: zoom</span>
+        </div>
+        <div id="pg-toolpath-wrap" style="margin-top:0.4em;"><canvas id="pg-toolpath-canvas"></canvas></div>
+        <div class="pg-toolpath-bar">
+          <span class="btn pg-small-btn" id="pg-toolpath-play">play</span>
+          <input type="range" id="pg-toolpath-slider" min="0" max="0" value="0" step="1">
+        </div>
+        <div id="pg-toolpath-label"></div>
+      </div>
+
     </div>
 
     <!-- Printer controls (shared with index.html / gcode-session.html) -->
@@ -527,6 +580,7 @@
   <script type="text/javascript" src="llm.js?v=1"></script>
   <script type="module" src="parametric-with-tool.js?v=3"></script>
   <script type="text/javascript" src="parametric-with-tool-compat.js?v=1"></script>
+  <script type="text/javascript" src="gcode-viewer.js?v=2"></script>
 </body>
 
 </html>

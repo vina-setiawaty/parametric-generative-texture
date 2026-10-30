@@ -424,6 +424,7 @@ function rerunGcode() {
   if (!ready) { digestEl.textContent = "not loaded"; return; }
   if (!scene.elements.length) {
     textarea.value = "";
+    window.gcodeViewer?.setGcode("");
     reportEl.textContent = "(no elements yet)";
     digestEl.innerHTML = `<p style="color:#999;">no elements yet — describe a graphic in the chat</p>`;
     scene.lastReport = null;
@@ -441,6 +442,7 @@ function rerunGcode() {
   scene.lastReport = compiled.report;
   saveScene();
   textarea.value = run.gcode;
+  window.gcodeViewer?.setGcode(run.gcode);
   reportEl.textContent = C.reportText(compiled.report);
 
   const errors = [...compiled.errors, ...run.errors];
